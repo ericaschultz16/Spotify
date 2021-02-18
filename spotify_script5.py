@@ -8,31 +8,16 @@ Created on Fri Jan 29 20:21:14 2021
 
 #Notebook for Spotify data
 
-#importing packages
+#Importing packages
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import json
 
-with open("/Users/ericaschultz/Desktop/My_Projects/DATA/spotify/MyData/YourLibrary.json") as file:
-    data = json.load(file)
-    
-df_keys = data.keys()    
-tracks = pd.DataFrame.from_dict(data['tracks'])
-albums = pd.DataFrame.from_dict(data['albums'])
-bannedTracks = pd.DataFrame.from_dict(data['bannedTracks'])
-other = pd.DataFrame.from_dict(data['other'])
 
-
-
-with open("/Users/ericaschultz/Desktop/My_Projects/DATA/spotify/MyData/StreamingHistory0.json") as file:
-    data1 = json.load(file)
-    
-stream0 = pd.DataFrame.from_dict(data1)
-
-tracks_stream = pd.merge(tracks, stream0, left_on = "track", right_on = "trackName", how = 'right')
-
+#Playlist Dataframe
+##########################################################################################
 
 with open("/Users/ericaschultz/Desktop/My_Projects/DATA/spotify/MyData/Playlist1.json") as file:
     data2 = json.load(file)   
@@ -83,4 +68,43 @@ for i in playlists.index:
 play_df.reset_index(inplace = True, drop = True)
     
 #To check that there are 81 playlists:
-len(play_df.playlist_name.unique())
+assert len(play_df.playlist_name.unique()) == 81
+
+
+
+#Streaming History
+##########################################################################################
+
+with open("/Users/ericaschultz/Desktop/My_Projects/DATA/spotify/MyData/StreamingHistory0.json") as file:
+    data1 = json.load(file)
+    
+stream_df = pd.DataFrame.from_dict(data1)
+
+
+file_names = ['StreamingHistory1', 'StreamingHistory2', 'StreamingHistory3']
+path = '/Users/ericaschultz/Desktop/My_Projects/DATA/spotify/MyData/'
+file_names = [path + i + '.json' for i in file_names]
+
+for i in file_names:
+    with open(i) as file:
+        temp = json.load(file)
+    temp_df = pd.DataFrame.from_dict(temp)
+    stream_df = pd.concat([stream_df, temp_df], ignore_index=True)
+    
+    
+#What are the total msPlayed for each song?
+stream_df.groupby('trackName').msPlayed.sum().sort_values()
+#There is an issue here because podcasts are counting as a track. I'm trying to think of the best way to figure out which tracks are podcasts.
+
+tracks_notin_library = list(set(stream_df.artistName) - set(play_df.artistName))
+
+oddsongs_total_msPlayed = stream_df.loc[stream_df.artistName.isin(tracks_notin_library)].groupby('trackName').msPlayed.sum().sort_values(ascending = False)
+oddsongs_df = pd.DataFrame(oddsongs_total_msPlayed)
+
+oddsongs_df = stream_df[['artistName', 'trackName']].merge(oddsongs_df, how = 'right', on = 'trackName')
+oddsongs_df.drop_duplicates(inplace = True)
+
+podcast_names = ['The Joe Rogan Experience', 'The Daily', 'Build a Career in Data Science', 'Mike and Brooker Show', 'Chicks in the Office']
+stream_df = stream_df[~stream_df.artistName.isin(podcast_names)]
+#now let's try again
+stream_df.groupby('trackName').msPlayed.sum().sort_values(ascending = False)
